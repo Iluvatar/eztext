@@ -1,0 +1,5 @@
+This is an extension of the ExText library for pygame, found here:
+
+    pygame.org/project-EzText-920-.html
+
+It adds support for multiple text boxes, easy value access, and better text deletion, as well as a few other minor things.
