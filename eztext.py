@@ -2,8 +2,40 @@ from pygame.locals import *
 import pygame
 
 
-class Input(object):
-    """ A text input for pygame apps """
+class TextInput(object):
+    """
+    A text input for pygame apps
+
+    Constructor option                      Default arg
+    ------------------                      -----------
+    position on screen                      pos=(0, 0)    # (x, y)
+    text color                              text_color=(0, 0, 0)    # (r, g, b)
+    input box width                         input_width=100
+    max string length (negative unlimited)  max_length=-1
+    set of allowed characters               allowed_chars=ALL_CHARS
+    input prompt                            prompt=""
+    default text                            default_text=""
+    allow key repeat (global)               set_key_repeat_speed=False
+    font                                    font=None
+
+    Public properties
+        locked input:       inputObj.locked
+        position:           inputObj.pos OR inputObj.x OR inputObj.y
+        user input:         inputObj.text
+        on change function: inputObj.on_change
+
+    To use, call update() with all pygame events, then draw() with the pygame surface to draw to
+
+        inputObj.update(events)
+        inputObj.draw(surface)
+
+    Other notes:
+        clicking the input selects it, clicking outside it deselects it
+        locked inputs cannot be selected or changed
+        opt+backspace deletes the last word
+        cmd/ctrl+backspace deletes the whole line
+
+    """
 
     unshifted_keys = {K_a: 'a', K_b: 'b', K_c: 'c', K_d: 'd', K_e: 'e', K_f: 'f', K_g: 'g', K_h: 'h', K_i: 'i',
                       K_j: 'j', K_k: 'k', K_l: 'l', K_m: 'm', K_n: 'n', K_o: 'o', K_p: 'p', K_q: 'q', K_r: 'r',
@@ -22,12 +54,12 @@ class Input(object):
 
     ALPHA = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
     NUMS = "0123456789"
-    ALPHA_NUMS = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-    ALL_CHARS = " !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+    SPECIAL = "!\"#$%&\\'()*+,-./:;<=>?@[\]^`{|}~"
+    ALPHA_NUMS = ALPHA + NUMS
+    ALL_CHARS = ALPHA + NUMS + SPECIAL
 
     def __init__(self, pos=(0, 0), text_color=(0, 0, 0), input_width=100, max_length=-1, allowed_chars=ALL_CHARS,
                  prompt="", default_text="", set_key_repeat_speed=False, font=None):
-        """ Options: x, y, font, color, unrestricted, max_length, prompt """
 
         pygame.init()
 
@@ -36,7 +68,7 @@ class Input(object):
         self.input_width = input_width
         self.max_length = max_length
         self.allowed_chars = set(allowed_chars)
-        self.prompt = prompt
+        self._prompt = prompt
         self.default_text = default_text
         if set_key_repeat_speed:
             pygame.key.set_repeat(150, 30)
@@ -45,19 +77,22 @@ class Input(object):
         else:
             self.font = font
 
-        self.rendered_prompt = self.font.render(self.prompt, 1, self.text_color)
-        self.prompt_size = self.rendered_prompt.get_size()
-        self.input_pad = self.font.render(' ', 1, self.text_color).get_width() / 2
-        self.input_box = None
-        self.focus_area = None
+        self._rendered_prompt = self.font.render(self._prompt, 1, self.text_color)
+        self._prompt_size = self._rendered_prompt.get_size()
+        self._input_pad = self.font.render(' ', 1, self.text_color).get_width() / 2
+        self._input_box = None
+        self._focus_area = None
         self._recalculate_boxes()
 
         self.focused = False
-        self.text = ""
+        self.value = ""
+        self.on_change = None
         self.shifted = 0
         self.alt = 0
         self.meta = 0
         self._locked = False
+
+    # getters and setters for position
 
     @property
     def x(self):
@@ -77,10 +112,14 @@ class Input(object):
         self._recalculate_boxes()
 
     def _recalculate_boxes(self):
-        self.input_box = pygame.Rect(self.x + self.prompt_size[0], self.y, self.input_width + self.input_pad * 2,
-                                     self.prompt_size[1])
-        self.focus_area = pygame.Rect(self.x, self.y, self.input_width + self.input_pad * 2 + self.prompt_size[0],
-                                      self.prompt_size[1])
+        """ recalculate the bounding boxes once the position is changed """
+
+        self._input_box = pygame.Rect(self.x + self._prompt_size[0], self.y, self.input_width + self._input_pad * 2,
+                                     self._prompt_size[1])
+        self._focus_area = pygame.Rect(self.x, self.y, self.input_width + self._input_pad * 2 + self._prompt_size[0],
+                                      self._prompt_size[1])
+
+    # getter and setter for locked property
 
     @property
     def locked(self):
@@ -92,43 +131,46 @@ class Input(object):
         if self._locked:
             self.focused = False
 
+    #
     def toggle_lock(self):
+        """ convenience method for switching the lock state """
+
         self.locked = not self.locked
 
     def draw(self, surface):
-        """ Draw the text input to a surface """
+        """ draw the input box on the given surface """
 
-        surface.blit(self.rendered_prompt, (self.x, self.y))
+        surface.blit(self._rendered_prompt, (self.x, self.y))
 
         # background
         if not self.locked:
-            pygame.draw.rect(surface, (252, 252, 252), self.input_box)
+            pygame.draw.rect(surface, (252, 252, 252), self._input_box)
         else:
-            pygame.draw.rect(surface, (235, 235, 235), self.input_box)
+            pygame.draw.rect(surface, (235, 235, 235), self._input_box)
 
         if self.focused:
-            pygame.draw.rect(surface, (58, 117, 255), self.input_box, 1)
+            pygame.draw.rect(surface, (58, 117, 255), self._input_box, 1)
         else:
-            pygame.draw.rect(surface, (208, 208, 208), self.input_box, 1)
-            pygame.draw.line(surface, (169, 169, 169), (self.x + self.prompt_size[0], self.y),
-                             (self.x + self.prompt_size[0] + self.input_width + self.input_pad * 2 - 2, self.y))
+            pygame.draw.rect(surface, (208, 208, 208), self._input_box, 1)
+            pygame.draw.line(surface, (169, 169, 169), (self.x + self._prompt_size[0], self.y),
+                             (self.x + self._prompt_size[0] + self.input_width + self._input_pad * 2 - 2, self.y))
 
-        if self.text == "" and not self.focused:
+        if self.value == "" and not self.focused:
             rendered_text = self.font.render(self.default_text, 1, (180, 180, 180))
         else:
-            rendered_text = self.font.render(self.text, 1, self.text_color)
+            rendered_text = self.font.render(self.value, 1, self.text_color)
 
-        surface.blit(rendered_text, (self.x + self.prompt_size[0] + self.input_pad, self.y))
+        surface.blit(rendered_text, (self.x + self._prompt_size[0] + self._input_pad, self.y))
 
     def update(self, events):
-        """ Update the input based on passed events """
+        """ update the state of the box with the given events """
 
         if self.locked:
             return
 
         for event in events:
             if event.type == MOUSEBUTTONDOWN:
-                self.focused = self.focus_area.collidepoint(event.pos)
+                self.focused = self._focus_area.collidepoint(event.pos)
             elif event.type == KEYUP:
                 self._update_modifier_level(event, -1)
             elif event.type == KEYDOWN:
@@ -142,6 +184,8 @@ class Input(object):
                 self._add_key(event)
 
     def _update_modifier_level(self, event, delta):
+        """ updates the modifier level is meta keys are pressed """
+
         if event.key == K_LSHIFT or event.key == K_RSHIFT:
             self.shifted += delta
             self.shifted = max(self.shifted, 0)
@@ -153,16 +197,20 @@ class Input(object):
             self.meta = max(self.meta, 0)
 
     def _handle_backspace(self, event):
+        """ handles the backspace key depending on which modifier keys are pressed """
+
         if event.key == K_BACKSPACE and self.meta > 0:
-            self.text = ""
+            self.value = ""
         elif event.key == K_BACKSPACE and self.alt > 0:
-            self.text = self.text.rstrip()
-            self.text = self.text[:self.text.rfind(' ') + 1]
+            self.value = self.value.rstrip()
+            self.value = self.value[:self.value.rfind(' ') + 1]
         elif event.key == K_BACKSPACE and self.meta == 0:
-            self.text = self.text[:-1]
+            self.value = self.value[:-1]
 
     def _add_key(self, event):
-        if len(self.text) == self.max_length >= 0:
+        """ adds the given key to the user text """
+
+        if len(self.value) == self.max_length >= 0:
             return
 
         if self.shifted:
@@ -171,4 +219,11 @@ class Input(object):
             key = self.unshifted_keys.get(event.key, '')
 
         if key in self.allowed_chars:
-            self.text += key
+            self.value += key
+
+        try:
+            self.on_change()
+        except TypeError:
+            pass
+
+
