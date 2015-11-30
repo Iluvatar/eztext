@@ -85,7 +85,7 @@ class TextInput(object):
         self._recalculate_boxes()
 
         self.focused = False
-        self.value = ""
+        self._text = ""
         self.on_change = None
         self.shifted = 0
         self.alt = 0
@@ -115,9 +115,9 @@ class TextInput(object):
         """ recalculate the bounding boxes once the position is changed """
 
         self._input_box = pygame.Rect(self.x + self._prompt_size[0], self.y, self.input_width + self._input_pad * 2,
-                                     self._prompt_size[1])
-        self._focus_area = pygame.Rect(self.x, self.y, self.input_width + self._input_pad * 2 + self._prompt_size[0],
                                       self._prompt_size[1])
+        self._focus_area = pygame.Rect(self.x, self.y, self.input_width + self._input_pad * 2 + self._prompt_size[0],
+                                       self._prompt_size[1])
 
     # getter and setter for locked property
 
@@ -131,11 +131,28 @@ class TextInput(object):
         if self._locked:
             self.focused = False
 
-    #
     def toggle_lock(self):
         """ convenience method for switching the lock state """
 
         self.locked = not self.locked
+
+    # getter and setter for value property
+
+    @property
+    def value(self):
+        return self._text
+
+    @value.setter
+    def value(self, value):
+        if self._text == value:
+            return
+
+        self._text = value
+
+        try:
+            self.on_change()
+        except TypeError:
+            pass
 
     def draw(self, surface):
         """ draw the input box on the given surface """
@@ -180,7 +197,6 @@ class TextInput(object):
                     continue
 
                 self._handle_backspace(event)
-
                 self._add_key(event)
 
     def _update_modifier_level(self, event, delta):
@@ -199,12 +215,15 @@ class TextInput(object):
     def _handle_backspace(self, event):
         """ handles the backspace key depending on which modifier keys are pressed """
 
-        if event.key == K_BACKSPACE and self.meta > 0:
+        if not event.key == K_BACKSPACE:
+            return
+
+        if self.meta > 0:
             self.value = ""
-        elif event.key == K_BACKSPACE and self.alt > 0:
+        elif self.alt > 0:
             self.value = self.value.rstrip()
             self.value = self.value[:self.value.rfind(' ') + 1]
-        elif event.key == K_BACKSPACE and self.meta == 0:
+        elif self.meta == 0:
             self.value = self.value[:-1]
 
     def _add_key(self, event):
@@ -221,9 +240,116 @@ class TextInput(object):
         if key in self.allowed_chars:
             self.value += key
 
+
+class RadioButton(object):
+    BUTTON_RADIUS = 8
+
+    def __init__(self, name, label, pos=(0, 0), text_color=(0, 0, 0), font=None):
+
+        pygame.init()
+
+        self.name = name
+        self.label = ' ' + label
+
+        self._pos = pos
+        self.text_color = text_color
+        if font is None:
+            self.font = pygame.font.Font(None, 32)
+        else:
+            self.font = font
+
+        self._rendered_label = self.font.render(self.label, 1, self.text_color)
+        self._label_size = self._rendered_label.get_size()
+        self._radio_button_pos = None
+        self._label_focus_area = None
+        self._recalculate_boxes()
+
+        self._selected = False
+        self.focused = False
+        self.on_change = None
+        self._locked = False
+
+        # getters and setters for position
+
+    @property
+    def x(self):
+        return self._pos[0]
+
+    @property
+    def y(self):
+        return self._pos[1]
+
+    @property
+    def pos(self):
+        return self._pos
+
+    @pos.setter
+    def pos(self, value):
+        self._pos = value
+        self._recalculate_boxes()
+
+    def _recalculate_boxes(self):
+        """ recalculate the bounding boxes once the position is changed """
+
+        self._radio_button_pos = (self.x + self.BUTTON_RADIUS, self._label_size[1] / 2 + self.y)
+        self._label_focus_area = pygame.Rect(self.x + self.BUTTON_RADIUS * 2, self.y, max(self._label_size[0],
+                                             self.BUTTON_RADIUS * 2), self.BUTTON_RADIUS * 2 + self._label_size[1])
+
+    # getter and setter for locked property
+
+    @property
+    def locked(self):
+        return self._locked
+
+    @locked.setter
+    def locked(self, value):
+        self._locked = value
+        if self._locked:
+            self.focused = False
+
+    def toggle_lock(self):
+        """ convenience method for switching the lock state """
+
+        self.locked = not self.locked
+
+    # getter and setter for value property
+
+    @property
+    def value(self):
+        return self._selected
+
+    @value.setter
+    def value(self, value):
+        if self._selected == value:
+            return
+
+        self._selected = value
+
         try:
             self.on_change()
         except TypeError:
             pass
 
+    def draw(self, surface):
+        """ draw the radio button on the given surface """
 
+        surface.blit(self._rendered_label, (self.x + self.BUTTON_RADIUS * 2, self.y))
+
+        if self.value:
+            pygame.draw.circle(surface, (43, 128, 255), self._radio_button_pos, self.BUTTON_RADIUS)
+            pygame.draw.circle(surface, (255, 255, 255), self._radio_button_pos, self.BUTTON_RADIUS / 4)
+        else:
+            pygame.draw.circle(surface, (150, 150, 150), self._radio_button_pos, self.BUTTON_RADIUS, 1)
+
+    def update(self, events):
+        """ update the state of the box with the given events """
+
+        if self.locked:
+            return
+
+        for event in events:
+            if event.type == MOUSEBUTTONDOWN:
+                self.focused = self._label_focus_area.collidepoint(event.pos) or \
+                                (event.pos[0] - self._radio_button_pos[0]) ** 2 + \
+                                (event.pos[1] - self._radio_button_pos[1]) ** 2 < self.BUTTON_RADIUS ** 2
+                self.value = self.value or self.focused
