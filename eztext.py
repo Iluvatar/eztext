@@ -31,6 +31,7 @@ class TextInput(InputObject):
     font                                    font=None
 
     Public properties
+        reference name:     inputObj.name
         locked input:       inputObj.locked
         position:           inputObj.pos OR inputObj.x OR inputObj.y
         user input:         inputObj.text
@@ -70,11 +71,12 @@ class TextInput(InputObject):
     ALPHA_NUMS = ALPHA + NUMS
     ALL_CHARS = ALPHA + NUMS + SPECIAL
 
-    def __init__(self, pos=(0, 0), text_color=(0, 0, 0), input_width=100, max_length=-1, allowed_chars=ALL_CHARS,
+    def __init__(self, name, pos=(0, 0), text_color=(0, 0, 0), input_width=100, max_length=-1, allowed_chars=ALL_CHARS,
                  prompt="", default_text="", set_key_repeat_speed=False, font=None):
 
         pygame.init()
 
+        self.name = name
         self._pos = pos
         self.text_color = text_color
         self.input_width = input_width
@@ -373,7 +375,9 @@ class RadioButton(InputObject):
 
 
 class RadioGroup(InputObject):
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
+
         self.radio_buttons = []
         self.id = 0
 
@@ -577,7 +581,9 @@ class CheckBox(InputObject):
 
 
 class CheckBoxGroup(InputObject):
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
+
         self.checkboxes = []
         self.id = 0
 
@@ -640,3 +646,69 @@ class CheckBoxGroup(InputObject):
 
         for r in self.checkboxes:
             r.update(events)
+
+
+class Form(InputObject):
+    def __init__(self, name):
+        self.name = name
+
+        self.form_objects = {}
+
+        self.on_change = None
+
+    # getter and setter for value property
+
+    @property
+    def value(self):
+        ret = {}
+        for e in self.form_objects:
+            ret[e] = self.form_objects[e].value
+
+        return ret
+
+    def set_value(self, name, value):
+        if name not in self.form_objects:
+            return
+
+        if name in self.form_objects and self.form_objects[name] == value:
+            return
+
+        if type(name) is not str:
+            return
+
+        self.form_objects[name] = value
+
+        try:
+            self.on_change()
+        except TypeError:
+            pass
+
+    def _on_change_function(self):
+        try:
+            self.on_change()
+        except TypeError:
+            pass
+
+    def add_form_object(self, form_object):
+        """ add a checkbox to track """
+
+        form_object.on_change = self._on_change_function
+        self.form_objects[form_object.name] = form_object
+
+    def remove_form_object(self, form_object):
+        """" remove a checkbox from tracking """
+
+        form_object.on_change = None
+        self.form_objects.pop(form_object)
+
+    def draw(self, screen):
+        """ draw all the checkboxes on the given surface """
+
+        for r in self.form_objects:
+            self.form_objects[r].draw(screen)
+
+    def update(self, events):
+        """ update all checkboxes with the given events """
+
+        for r in self.form_objects:
+            self.form_objects[r].update(events)
