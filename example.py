@@ -16,8 +16,10 @@ def main():
     def p(this):
         def ret():
             print this.value
-
         return ret
+
+    # allows repeats when holding down a key
+    pyform.set_key_repeat(True)
 
     # checkbox group with 4 options
     checkgroup = pyform.CheckBoxGroup("checkgroup")
@@ -38,7 +40,7 @@ def main():
 
     # adding text boxes to the form directly
     form.add_form_object(pyform.TextInput("txt1", pos=(10, 10), default_text="First name", input_width=360,
-                                          max_length=16, set_key_repeat_speed=True))
+                                          max_length=16))
     form.add_form_object(pyform.TextInput("txt2", pos=(10, 50), default_text="Last name", input_width=360,
                                           max_length=16))
     form.add_form_object(pyform.TextInput("txt3", pos=(10, 90), default_text="Age", input_width=360, max_length=4,

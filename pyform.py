@@ -2,6 +2,13 @@ from pygame.locals import *
 import pygame
 
 
+def set_key_repeat(p):
+    if p:
+        pygame.key.set_repeat(150, 30)
+    else:
+        pygame.key.set_repeat()
+
+
 class InputObject(object):
     @property
     def value(self):
@@ -27,7 +34,6 @@ class TextInput(InputObject):
     set of allowed characters               allowed_chars=ALL_CHARS
     input prompt                            prompt=""
     default text                            default_text=""
-    allow key repeat (global)               set_key_repeat_speed=False
     font                                    font=None
 
     Public properties
@@ -72,7 +78,7 @@ class TextInput(InputObject):
     ALL_CHARS = ALPHA + NUMS + SPECIAL
 
     def __init__(self, name, pos=(0, 0), text_color=(0, 0, 0), input_width=100, max_length=-1, allowed_chars=ALL_CHARS,
-                 prompt="", default_text="", set_key_repeat_speed=False, font=None):
+                 prompt="", default_text="", font=None):
 
         pygame.init()
 
@@ -84,8 +90,6 @@ class TextInput(InputObject):
         self.allowed_chars = set(allowed_chars)
         self._prompt = prompt
         self.default_text = default_text
-        if set_key_repeat_speed:
-            pygame.key.set_repeat(150, 30)
         if font is None:
             self.font = pygame.font.Font(None, 32)
         else:
@@ -430,6 +434,9 @@ class RadioGroup(InputObject):
     def add_button(self, radio_button):
         """ add a radio button to track """
 
+        if type(radio_button) is not RadioButton:
+            return
+
         radio_button.on_change = self._on_change_function(self.id)
         self.radio_buttons.append(radio_button)
         self.id += 1
@@ -624,6 +631,9 @@ class CheckBoxGroup(InputObject):
 
     def add_checkbox(self, checkbox):
         """ add a checkbox to track """
+
+        if type(checkbox) is not CheckBox:
+            return
 
         checkbox.on_change = self._on_change_function(self.id)
         self.checkboxes.append(checkbox)
