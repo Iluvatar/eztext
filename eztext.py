@@ -2,7 +2,19 @@ from pygame.locals import *
 import pygame
 
 
-class TextInput(object):
+class InputObject(object):
+    @property
+    def value(self):
+        raise NotImplementedError("Not implemented")
+
+    def draw(self, surface):
+        raise NotImplementedError("Not implemented")
+
+    def update(self, events):
+        raise NotImplementedError("Not implemented")
+
+
+class TextInput(InputObject):
     """
     A text input for pygame apps
 
@@ -147,6 +159,9 @@ class TextInput(object):
         if self._text == value:
             return
 
+        if type(value) is not str:
+            return
+
         self._text = value
 
         try:
@@ -241,7 +256,7 @@ class TextInput(object):
             self.value += key
 
 
-class RadioButton(object):
+class RadioButton(InputObject):
     BUTTON_RADIUS = 8
 
     def __init__(self, name, label, pos=(0, 0), text_color=(0, 0, 0), font=None):
@@ -269,7 +284,7 @@ class RadioButton(object):
         self.on_change = None
         self._locked = False
 
-        # getters and setters for position
+    # getters and setters for position
 
     @property
     def x(self):
@@ -291,9 +306,8 @@ class RadioButton(object):
     def _recalculate_boxes(self):
         """ recalculate the bounding boxes once the position is changed """
 
-        self._radio_button_pos = (self.x + self.BUTTON_RADIUS, self._label_size[1] / 2 + self.y)
-        self._label_focus_area = pygame.Rect(self.x + self.BUTTON_RADIUS * 2, self.y, max(self._label_size[0],
-                                             self.BUTTON_RADIUS * 2), self.BUTTON_RADIUS * 2 + self._label_size[1])
+        self._radio_button_pos = (self.x + self.BUTTON_RADIUS, self.y + self._label_size[1] / 2)
+        self._label_focus_area = pygame.Rect((self.x + self.BUTTON_RADIUS * 2, self.y), self._label_size)
 
     # getter and setter for locked property
 
@@ -323,6 +337,9 @@ class RadioButton(object):
         if self._selected == value:
             return
 
+        if type(value) is not bool:
+            return
+
         self._selected = value
 
         try:
@@ -349,7 +366,277 @@ class RadioButton(object):
 
         for event in events:
             if event.type == MOUSEBUTTONDOWN:
-                self.focused = self._label_focus_area.collidepoint(event.pos) or \
-                                (event.pos[0] - self._radio_button_pos[0]) ** 2 + \
-                                (event.pos[1] - self._radio_button_pos[1]) ** 2 < self.BUTTON_RADIUS ** 2
+                self.focused = bool(self._label_focus_area.collidepoint(event.pos)) or \
+                               ((event.pos[0] - self._radio_button_pos[0]) ** 2 +
+                                (event.pos[1] - self._radio_button_pos[1]) ** 2 < self.BUTTON_RADIUS ** 2)
                 self.value = self.value or self.focused
+
+
+class RadioGroup(InputObject):
+    def __init__(self):
+        self.radio_buttons = []
+        self.id = 0
+
+        self._selected = -1
+        self.on_change = None
+
+    # getter and setter for value property
+
+    @property
+    def value(self):
+        return self._selected
+
+    @value.setter
+    def value(self, value):
+        if self._selected == value:
+            return
+
+        if type(value) is not int:
+            return
+
+        self._selected = value
+
+        for i in range(len(self.radio_buttons)):
+            if i != value:
+                self.radio_buttons[i].value = False
+
+        self.radio_buttons[value].value = True
+
+        try:
+            self.on_change()
+        except TypeError:
+            pass
+
+    def _on_change_function(self, change_id):
+        def ret():
+            self._update_function(change_id)
+
+        return ret
+
+    def _update_function(self, change_id):
+        if not self.radio_buttons[change_id].value:
+            return
+
+        for i in range(len(self.radio_buttons)):
+            if i != change_id:
+                self.radio_buttons[i].value = False
+
+        self.value = change_id
+
+    def add_button(self, radio_button):
+        """ add a radio button to track """
+
+        radio_button.on_change = self._on_change_function(self.id)
+        self.radio_buttons.append(radio_button)
+        self.id += 1
+
+    def remove_button(self, radio_button):
+        """" remove a radio button from tracking """
+
+        radio_button.on_change = None
+        self.radio_buttons.remove(radio_button)
+
+    def draw(self, screen):
+        """ draw all the radio buttons on the given surface """
+
+        for r in self.radio_buttons:
+            r.draw(screen)
+
+    def update(self, events):
+        """ update all radio buttons with the given events """
+
+        for r in self.radio_buttons:
+            r.update(events)
+
+
+class CheckBox(InputObject):
+    BOX_SIDE_LENGTH = 16
+
+    def __init__(self, name, label, pos=(0, 0), text_color=(0, 0, 0), font=None):
+
+        pygame.init()
+
+        self.name = name
+        self.label = ' ' + label
+
+        self._pos = pos
+        self.text_color = text_color
+        if font is None:
+            self.font = pygame.font.Font(None, 32)
+        else:
+            self.font = font
+
+        self._rendered_label = self.font.render(self.label, 1, self.text_color)
+        self._label_size = self._rendered_label.get_size()
+        self._checkbox_rect = None
+        self._label_focus_area = None
+        self._recalculate_boxes()
+
+        self._selected = False
+        self.focused = False
+        self.on_change = None
+        self._locked = False
+
+    # getters and setters for position
+
+    @property
+    def x(self):
+        return self._pos[0]
+
+    @property
+    def y(self):
+        return self._pos[1]
+
+    @property
+    def pos(self):
+        return self._pos
+
+    @pos.setter
+    def pos(self, value):
+        self._pos = value
+        self._recalculate_boxes()
+
+    def _recalculate_boxes(self):
+        """ recalculate the bounding boxes once the position is changed """
+
+        self._checkbox_rect = pygame.Rect(self.x, self.y + self._label_size[1] / 2 - self.BOX_SIDE_LENGTH / 2,
+                                          self.BOX_SIDE_LENGTH, self.BOX_SIDE_LENGTH)
+        self._label_focus_area = pygame.Rect((self.x + self.BOX_SIDE_LENGTH, self.y), self._label_size)
+
+    # getter and setter for locked property
+
+    @property
+    def locked(self):
+        return self._locked
+
+    @locked.setter
+    def locked(self, value):
+        self._locked = value
+        if self._locked:
+            self.focused = False
+
+    def toggle_lock(self):
+        """ convenience method for switching the lock state """
+
+        self.locked = not self.locked
+
+    # getter and setter for value property
+
+    @property
+    def value(self):
+        return self._selected
+
+    @value.setter
+    def value(self, value):
+        if self._selected == value:
+            return
+
+        if type(value) is not bool:
+            return
+
+        self._selected = value
+
+        try:
+            self.on_change()
+        except TypeError:
+            pass
+
+    def draw(self, surface):
+        """ draw the radio button on the given surface """
+
+        surface.blit(self._rendered_label, (self.x + self.BOX_SIDE_LENGTH, self.y))
+
+        p1 = list(self._checkbox_rect.center)
+        p1[0] -= self.BOX_SIDE_LENGTH / 3
+
+        p2 = list(self._checkbox_rect.center)
+        p2[0] -= self.BOX_SIDE_LENGTH / 8
+        p2[1] += self.BOX_SIDE_LENGTH / 4
+
+        p3 = list(self._checkbox_rect.center)
+        p3[0] += self.BOX_SIDE_LENGTH / 4
+        p3[1] -= self.BOX_SIDE_LENGTH / 3
+
+        if self.value:
+            pygame.draw.rect(surface, (43, 128, 255), self._checkbox_rect, 0)
+            pygame.draw.lines(surface, (255, 255, 255), False, (p1, p2, p3), 2)
+        else:
+            pygame.draw.rect(surface, (150, 150, 150), self._checkbox_rect, 1)
+
+    def update(self, events):
+        """ update the state of the box with the given events """
+
+        if self.locked:
+            return
+
+        for event in events:
+            if event.type == MOUSEBUTTONDOWN:
+                self.focused = bool(self._label_focus_area.collidepoint(event.pos)) or \
+                               bool(self._checkbox_rect.collidepoint(event.pos))
+                self.value = self.focused ^ self.value
+
+
+class CheckBoxGroup(InputObject):
+    def __init__(self):
+        self.checkboxes = []
+        self.id = 0
+
+        self._selected = []
+        self.on_change = None
+
+    # getter and setter for value property
+
+    @property
+    def value(self):
+        return self._selected
+
+    def set_value(self, iden, value):
+        if (iden in self._selected) == value:
+            return
+
+        if type(iden) is not int or type(value) is not bool:
+            return
+
+        if value:
+            self._selected.append(iden)
+        else:
+            self._selected.remove(iden)
+
+        try:
+            self.on_change()
+        except TypeError:
+            pass
+
+    def _on_change_function(self, change_id):
+        def ret():
+            self._update_function(change_id)
+
+        return ret
+
+    def _update_function(self, change_id):
+        self.set_value(change_id, self.checkboxes[change_id].value)
+
+    def add_checkbox(self, checkbox):
+        """ add a checkbox to track """
+
+        checkbox.on_change = self._on_change_function(self.id)
+        self.checkboxes.append(checkbox)
+        self.id += 1
+
+    def remove_button(self, radio_button):
+        """" remove a checkbox from tracking """
+
+        radio_button.on_change = None
+        self.checkboxes.remove(radio_button)
+
+    def draw(self, screen):
+        """ draw all the checkboxes on the given surface """
+
+        for r in self.checkboxes:
+            r.draw(screen)
+
+    def update(self, events):
+        """ update all checkboxes with the given events """
+
+        for r in self.checkboxes:
+            r.update(events)
