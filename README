@@ -1,5 +1,15 @@
-This is an extension of the ExText library for pygame, found here:
+Adds support for HTML-like inputs in pygame. Input types are:
 
-    pygame.org/project-EzText-920-.html
+    - TextInput         Single line text input box
 
-It adds support for multiple text boxes, easy value access, and better text deletion, as well as a few other minor things.
+    - RadioButton       Single radio button
+
+    - RadioGroup        Group of radio buttons
+
+    - CheckBox          Single checkbox
+
+    - CheckBoxGroup     Group of checkboxes
+
+    - Form              Container for multiple form elements
+
+Examples can be found in example.py.
