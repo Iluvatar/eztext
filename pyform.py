@@ -21,6 +21,29 @@ class InputObject(object):
         raise NotImplementedError("Not implemented")
 
 
+class Label(InputObject):
+    def __init__(self, name, text, pos=(0, 0), text_color=(0, 0, 0), font=None):
+        self.name = name
+        self.text = text
+        self.pos = pos
+        self.text_color = text_color
+        if font is None:
+            self.font = pygame.font.Font(None, 32)
+        else:
+            self.font = font
+
+    @property
+    def value(self):
+        return self.text
+
+    def update(self, events):
+        pass
+
+    def draw(self, surface):
+        rendered_text = self.font.render(self.text, 1, self.text_color)
+        surface.blit(rendered_text, self.pos)
+
+
 class TextInput(InputObject):
     """
     A text input for pygame apps
@@ -78,7 +101,7 @@ class TextInput(InputObject):
     ALL_CHARS = ALPHA + NUMS + SPECIAL
 
     def __init__(self, name, pos=(0, 0), text_color=(0, 0, 0), input_width=100, max_length=-1, allowed_chars=ALL_CHARS,
-                 prompt="", default_text="", font=None):
+                 prompt="", default_text="", on_change=None, font=None):
 
         pygame.init()
 
@@ -90,6 +113,7 @@ class TextInput(InputObject):
         self.allowed_chars = set(allowed_chars)
         self._prompt = prompt
         self.default_text = default_text
+        self.on_change = on_change
         if font is None:
             self.font = pygame.font.Font(None, 32)
         else:
@@ -104,7 +128,6 @@ class TextInput(InputObject):
 
         self.focused = False
         self._text = ""
-        self.on_change = None
         self.shifted = 0
         self.alt = 0
         self.meta = 0
@@ -265,7 +288,7 @@ class TextInput(InputObject):
 class RadioButton(InputObject):
     BUTTON_RADIUS = 8
 
-    def __init__(self, name, label, pos=(0, 0), text_color=(0, 0, 0), font=None):
+    def __init__(self, name, label, pos=(0, 0), text_color=(0, 0, 0), on_change=None, font=None):
 
         pygame.init()
 
@@ -274,6 +297,7 @@ class RadioButton(InputObject):
 
         self._pos = pos
         self.text_color = text_color
+        self.on_change = on_change
         if font is None:
             self.font = pygame.font.Font(None, 32)
         else:
@@ -287,7 +311,6 @@ class RadioButton(InputObject):
 
         self._selected = False
         self.focused = False
-        self.on_change = None
         self._locked = False
 
     # getters and setters for position
@@ -379,14 +402,14 @@ class RadioButton(InputObject):
 
 
 class RadioGroup(InputObject):
-    def __init__(self, name):
+    def __init__(self, name, on_change=None):
         self.name = name
+        self.on_change = on_change
 
         self.radio_buttons = []
         self.id = 0
 
         self._selected = -1
-        self.on_change = None
 
     # getter and setter for value property
 
@@ -463,7 +486,7 @@ class RadioGroup(InputObject):
 class CheckBox(InputObject):
     BOX_SIDE_LENGTH = 16
 
-    def __init__(self, name, label, pos=(0, 0), text_color=(0, 0, 0), font=None):
+    def __init__(self, name, label, pos=(0, 0), text_color=(0, 0, 0), on_change=None, font=None):
 
         pygame.init()
 
@@ -472,6 +495,7 @@ class CheckBox(InputObject):
 
         self._pos = pos
         self.text_color = text_color
+        self.on_change = on_change
         if font is None:
             self.font = pygame.font.Font(None, 32)
         else:
@@ -485,7 +509,6 @@ class CheckBox(InputObject):
 
         self._selected = False
         self.focused = False
-        self.on_change = None
         self._locked = False
 
     # getters and setters for position
@@ -588,14 +611,14 @@ class CheckBox(InputObject):
 
 
 class CheckBoxGroup(InputObject):
-    def __init__(self, name):
+    def __init__(self, name, on_change=None):
         self.name = name
+        self.on_change = on_change
 
         self.checkboxes = []
         self.id = 0
 
         self._selected = []
-        self.on_change = None
 
     # getter and setter for value property
 
@@ -659,12 +682,11 @@ class CheckBoxGroup(InputObject):
 
 
 class Form(InputObject):
-    def __init__(self, name):
+    def __init__(self, name, on_change=None):
         self.name = name
+        self.on_change = on_change
 
         self.form_objects = {}
-
-        self.on_change = None
 
     # getter and setter for value property
 
