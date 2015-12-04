@@ -438,6 +438,9 @@ class RadioGroup(InputObject):
         except TypeError:
             pass
 
+    def __len__(self):
+        return len(self.radio_buttons)
+
     def _on_change_function(self, change_id):
         def ret():
             self._update_function(change_id)
@@ -643,6 +646,9 @@ class CheckBoxGroup(InputObject):
         except TypeError:
             pass
 
+    def __len__(self):
+        return len(self.checkboxes)
+
     def _on_change_function(self, change_id):
         def ret():
             self._update_function(change_id)
@@ -697,6 +703,9 @@ class Form(InputObject):
             ret[e] = self.form_objects[e].value
 
         return ret
+
+    def __len__(self):
+        return len(self.form_objects)
 
     def set_value(self, name, value):
         if name not in self.form_objects:
